@@ -1,0 +1,92 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Boutique Analytics API deployed as a Lambda container with a Function URL.
+
+Parameters:
+  DatabaseUrl:
+    Type: String
+    NoEcho: true
+    Description: Full RDS PostgreSQL URL; sslmode=require URLs are accepted.
+  RedisUrl:
+    Type: String
+    NoEcho: true
+    Description: TLS Redis connection URL, normally rediss://...
+  JwtSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+    Description: Unique random secret used to sign application JWTs.
+  FrontendOrigin:
+    Type: String
+    Default: http://localhost:5173
+    Description: Exact HTTPS frontend origin allowed by FastAPI CORS.
+  LambdaSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: At least two private subnets in the VPC that contains RDS and ElastiCache.
+  LambdaSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Lambda security group allowed to reach RDS on 5432 and Redis on 6379.
+  KaggleUsername:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Optional server-side Kaggle username for the import action.
+  KaggleKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Optional server-side Kaggle API key for the import action.
+
+Globals:
+  Function:
+    Architectures:
+      - x86_64
+    MemorySize: 1024
+    Timeout: 900
+    EphemeralStorage:
+      Size: 1024
+
+Resources:
+  BoutiqueApi:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      ImageConfig:
+        Command:
+          - boutique.lambda_handler.handler
+      Environment:
+        Variables:
+          ENVIRONMENT: production
+          DEBUG: "false"
+          SERVERLESS: "true"
+          DATABASE_URL: !Ref DatabaseUrl
+          REDIS_URL: !Ref RedisUrl
+          JWT_SECRET: !Ref JwtSecret
+          JWT_ACCESS_TTL_MINUTES: "60"
+          JWT_REFRESH_TTL_DAYS: "7"
+          COOKIE_SECURE: "true"
+          # Function URL and Amplify use different domains. For a same-site custom-domain
+          # deployment, change this to lax and keep both behind the same origin.
+          COOKIE_SAMESITE: none
+          CORS_ORIGINS: !Ref FrontendOrigin
+          KAGGLE_USERNAME: !Ref KaggleUsername
+          KAGGLE_KEY: !Ref KaggleKey
+          KAGGLE_OLIST_DATASET: olistbr/brazilian-ecommerce
+      FunctionUrlConfig:
+        AuthType: NONE
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroupId
+        SubnetIds: !Ref LambdaSubnetIds
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+    Metadata:
+      Dockerfile: Dockerfile.lambda
+      DockerContext: ../backend
+      DockerTag: boutique-api-python3.14-v1
+
+Outputs:
+  BoutiqueApiFunctionUrl:
+    Description: Public Lambda Function URL. Append api/v1 when assigning VITE_API_BASE_URL.
+    Value: !GetAtt BoutiqueApiUrl.FunctionUrl

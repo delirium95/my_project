@@ -1,0 +1,24 @@
+default_stages: [pre-commit]
+minimum_pre_commit_version: "4.0.0"
+
+repos:
+  - repo: local
+    hooks:
+      - id: backend-ruff-format
+        name: backend ruff format
+        entry: bash -c 'cd backend && uv run ruff format --check src tests'
+        language: system
+        pass_filenames: false
+        files: ^backend/(src|tests)/.*\.py$
+      - id: backend-ruff-lint
+        name: backend ruff check
+        entry: bash -c 'cd backend && uv run ruff check src tests'
+        language: system
+        pass_filenames: false
+        files: ^backend/(src|tests)/.*\.py$
+      - id: backend-unit-tests
+        name: backend unit tests
+        entry: bash -c 'cd backend && uv run pytest tests/unit'
+        language: system
+        pass_filenames: false
+        files: ^backend/(src|tests)/.*\.py$
