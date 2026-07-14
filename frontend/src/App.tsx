@@ -22,9 +22,11 @@ import { AuthForm } from "./components/AuthForm";
 import { CategoryRevenueConcentrationChart } from "./components/CategoryRevenueConcentrationChart";
 import { CohortRetentionHeatmap } from "./components/CohortRetentionHeatmap";
 import { DashboardHeader } from "./components/DashboardHeader";
+import { DatasetTakeaways } from "./components/DatasetTakeaways";
 import { LogNormalFitDiagnostics } from "./components/LogNormalFitDiagnostics";
 import { MetricCard } from "./components/MetricCard";
 import { OrderValueDistributionChart } from "./components/OrderValueDistributionChart";
+import { OrderValueDensityChart } from "./components/OrderValueDensityChart";
 import { PearsonCorrelationHeatmap } from "./components/PearsonCorrelationHeatmap";
 import { RecentOrdersTable } from "./components/RecentOrdersTable";
 import { RevenueChart } from "./components/RevenueChart";
@@ -148,10 +150,19 @@ function Dashboard({ accessToken, onLogout }: { accessToken: string; onLogout: (
               </Grid>
             </Grid>
             <AnalyticsDateFilter dateRange={dateRange} onChange={setDateRange} />
+            <DatasetTakeaways
+              categoryRevenueConcentration={data.categoryRevenueConcentration}
+              correlations={data.correlations}
+              fit={data.logNormalFit}
+              summary={data.summary}
+            />
             <RevenueChart points={data.revenue} />
             <Grid container spacing={3}>
               <Grid size={{ md: 6, xs: 12 }}>
-                <OrderValueDistributionChart bins={data.distribution} fit={data.logNormalFit} />
+                <Stack spacing={3}>
+                  <OrderValueDistributionChart bins={data.distribution} />
+                  <OrderValueDensityChart fit={data.logNormalFit} />
+                </Stack>
               </Grid>
               <Grid size={{ md: 6, xs: 12 }}>
                 <PearsonCorrelationHeatmap correlations={data.correlations} />
