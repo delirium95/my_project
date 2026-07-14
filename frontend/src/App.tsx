@@ -165,17 +165,13 @@ function Dashboard({ accessToken, onLogout }: { accessToken: string; onLogout: (
                 </Stack>
               </Grid>
               <Grid size={{ md: 6, xs: 12 }}>
-                <PearsonCorrelationHeatmap correlations={data.correlations} />
+                <Stack spacing={3}>
+                  <PearsonCorrelationHeatmap correlations={data.correlations} />
+                  <LogNormalFitDiagnostics fit={data.logNormalFit} />
+                </Stack>
               </Grid>
             </Grid>
-            <Grid container spacing={3}>
-              <Grid size={{ md: 6, xs: 12 }}>
-                <CategoryRevenueConcentrationChart points={data.categoryRevenueConcentration} />
-              </Grid>
-              <Grid size={{ md: 6, xs: 12 }}>
-                <LogNormalFitDiagnostics fit={data.logNormalFit} />
-              </Grid>
-            </Grid>
+            <CategoryRevenueConcentrationChart points={data.categoryRevenueConcentration} />
             <CohortRetentionHeatmap points={data.cohortRetention} />
             <RecentOrdersTable orders={data.orders} />
           </Stack>

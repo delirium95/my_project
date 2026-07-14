@@ -45,6 +45,7 @@ export function AnalyticsDateFilter({ dateRange, onChange }: AnalyticsDateFilter
           disabled={!dateRange.start_date && !dateRange.end_date}
           startIcon={<RestartAltRoundedIcon />}
           onClick={() => onChange({})}
+          sx={{ alignSelf: { md: "flex-end" } }}
         >
           Reset
         </Button>
