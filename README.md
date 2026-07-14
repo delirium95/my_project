@@ -57,7 +57,7 @@ place where production adapters are wired to application ports.
 | `backend/alembic/` | Database migrations |
 | `docker-compose.yml` | Local PostgreSQL and Redis services |
 | `APP_OVERVIEW.md` | Concise product and EDA overview |
-| `docs/cloud-deployment.md` | AWS Lambda, RDS, ElastiCache, and Amplify deployment walkthrough |
+| `docs/cloud-deployment.md` | AWS Lambda, RDS, ElastiCache, private S3, and CloudFront deployment walkthrough |
 
 ## Product flow
 
@@ -212,8 +212,8 @@ npm run build
 
 ## Deploy to the cloud
 
-The AWS deployment profile is **Amplify Hosting → Lambda Function URL → RDS PostgreSQL +
-ElastiCache Serverless**. The API runs as the included Lambda container image with
+The AWS deployment profile is **CloudFront → private S3 static site** plus a **Lambda Function
+URL → RDS PostgreSQL + ElastiCache Redis** API. The API runs as the included Lambda container image with
 `SERVERLESS=true`; RDS and Redis remain private in the VPC.
 
 Follow the complete, copy-ready setup in [docs/cloud-deployment.md](docs/cloud-deployment.md).

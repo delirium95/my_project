@@ -59,7 +59,7 @@ dataset refresh, so stale aggregates are never silently kept after an import.
 
 ## Deployment shape
 
-The intended AWS cloud shape is Amplify static hosting → Lambda Function URL/FastAPI → RDS
+The intended AWS cloud shape is CloudFront + private S3 static hosting → Lambda Function URL/FastAPI → RDS
 PostgreSQL and ElastiCache Redis inside a VPC. The app currently ships with its local JWT
 adapter; Auth0 can be introduced as a second `TokenService` implementation. Set
 `SERVERLESS=true` in Lambda to use SQLAlchemy `NullPool`, which prevents connection-pool

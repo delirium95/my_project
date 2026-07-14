@@ -86,7 +86,37 @@ Resources:
       DockerContext: ../backend
       DockerTag: boutique-api-python3.14-v1
 
+  BoutiqueMigration:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      ImageConfig:
+        Command:
+          - boutique.migration_handler.handler
+      Environment:
+        Variables:
+          ENVIRONMENT: production
+          SERVERLESS: "true"
+          DATABASE_URL: !Ref DatabaseUrl
+          REDIS_URL: !Ref RedisUrl
+          JWT_SECRET: !Ref JwtSecret
+          COOKIE_SECURE: "true"
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroupId
+        SubnetIds: !Ref LambdaSubnetIds
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+    Metadata:
+      Dockerfile: Dockerfile.lambda
+      DockerContext: ../backend
+      DockerTag: boutique-migration-python3.14-v1
+
 Outputs:
   BoutiqueApiFunctionUrl:
     Description: Public Lambda Function URL. Append api/v1 when assigning VITE_API_BASE_URL.
     Value: !GetAtt BoutiqueApiUrl.FunctionUrl
+  BoutiqueMigrationFunctionName:
+    Description: Invoke this one-off Lambda after deployment to apply Alembic migrations.
+    Value: !Ref BoutiqueMigration
