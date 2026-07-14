@@ -21,11 +21,21 @@ function curvePoints(
     return "";
   }
   return points
-    .map((point) => {
-      const x = ((Number(point.order_value) - lowerBound) / (upperBound - lowerBound)) * 100;
+    .flatMap((point) => {
+      const orderValue = Number(point.order_value);
+      const density = Number(point.density);
+      if (
+        !Number.isFinite(orderValue) ||
+        !Number.isFinite(density) ||
+        orderValue < lowerBound ||
+        orderValue > upperBound
+      ) {
+        return [];
+      }
+      const x = ((orderValue - lowerBound) / (upperBound - lowerBound)) * 100;
       const expectedOrders = point.density * sampleSize * binWidth;
-      const y = 100 - Math.min((expectedOrders / maximumOrders) * 100, 100);
-      return `${x},${y}`;
+      const y = Math.max(0, Math.min(100, 100 - (expectedOrders / maximumOrders) * 100));
+      return [`${x},${y}`];
     })
     .join(" ");
 }
@@ -34,6 +44,7 @@ export function OrderValueDistributionChart({ bins, fit }: OrderValueDistributio
   const maximumOrders = Math.max(...bins.map((bin) => bin.order_count), 1);
   const logNormalCurve = curvePoints(fit.density_points, bins, fit.sample_size, maximumOrders);
   const kdeCurve = curvePoints(fit.kde_points, bins, fit.sample_size, maximumOrders);
+  const tickStride = Math.max(1, Math.ceil(bins.length / 5));
 
   return (
     <Paper component="section" variant="outlined" sx={{ p: 3 }}>
@@ -49,11 +60,12 @@ export function OrderValueDistributionChart({ bins, fit }: OrderValueDistributio
         </Typography>
       ) : (
         <>
-          <Box sx={{ position: "relative" }}>
+          <Box sx={{ overflow: "hidden", position: "relative" }}>
             <Stack aria-label="Order-value distribution" direction="row" spacing={0.75} sx={{ height: 250, mt: 3 }}>
-            {bins.map((bin) => {
+            {bins.map((bin, index) => {
               const height = Math.max((bin.order_count / maximumOrders) * 100, 2);
               const label = `${formatMoney(bin.lower_bound)} – ${formatMoney(bin.upper_bound)}: ${bin.order_count.toLocaleString()} orders`;
+              const showTick = index % tickStride === 0 || index === bins.length - 1;
 
               return (
                 <Tooltip key={`${bin.lower_bound}-${bin.upper_bound}`} title={label}>
@@ -70,7 +82,14 @@ export function OrderValueDistributionChart({ bins, fit }: OrderValueDistributio
                         }}
                       />
                     </Box>
-                    <Typography color="text.secondary" noWrap textAlign="center" variant="caption">
+                    <Typography
+                      aria-hidden={!showTick}
+                      color="text.secondary"
+                      noWrap
+                      sx={{ visibility: showTick ? "visible" : "hidden" }}
+                      textAlign="center"
+                      variant="caption"
+                    >
                       {formatMoney(bin.lower_bound)}
                     </Typography>
                   </Box>
@@ -83,7 +102,16 @@ export function OrderValueDistributionChart({ bins, fit }: OrderValueDistributio
               aria-label="Log-normal and KDE density curves"
               component="svg"
               preserveAspectRatio="none"
-              sx={{ bottom: 42, left: 0, pointerEvents: "none", position: "absolute", right: 0, top: 24 }}
+              sx={{
+                bottom: 42,
+                display: "block",
+                left: 0,
+                overflow: "hidden",
+                pointerEvents: "none",
+                position: "absolute",
+                right: 0,
+                top: 24,
+              }}
               viewBox="0 0 100 100"
             >
               <polyline fill="none" points={logNormalCurve} stroke="#5246d8" strokeWidth="1.5" />
