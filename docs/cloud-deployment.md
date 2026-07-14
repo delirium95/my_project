@@ -1,7 +1,8 @@
 # Deploy Boutique Analytics on AWS
 
 The demo deployment is deliberately cost-conscious and uses the existing default VPC in
-`us-east-1`. It does not create a NAT Gateway.
+`us-east-1`. A one-AZ NAT Gateway is optional, and is used only when the in-app Kaggle importer
+needs outbound internet access.
 
 ```mermaid
 flowchart LR
@@ -30,8 +31,8 @@ invalidates CloudFront. No database or Redis credential enters the frontend bund
 
 - RDS `db.t3.micro` (20 GiB), one `cache.t3.micro` Redis node, CloudFront Price Class 100, and
   S3 are appropriate only for a short-lived demo. They continue to bill while running.
-- No NAT Gateway means the deployed Lambda cannot download the Kaggle archive. Import Olist data
-  locally before the demo, or explicitly add a NAT Gateway later.
+- The Kaggle importer needs a NAT Gateway while it downloads the archive. Enable the supplied
+  one-AZ option, import once, then disable it to stop the NAT hourly charge.
 - The default VPC subnets are sufficient for this demo. The database and cache remain private:
   only the Lambda security group can reach ports 5432 and 6379.
 
@@ -92,6 +93,8 @@ Add these environment **secrets**:
 | `DATABASE_URL` | PostgreSQL URL constructed above |
 | `REDIS_URL` | `RedisUrl` output |
 | `JWT_SECRET` | a new random value of 32+ characters |
+| `KAGGLE_USERNAME` | Kaggle account username, when enabling the importer |
+| `KAGGLE_KEY` | Kaggle API token, when enabling the importer |
 
 The foundation role trusts only GitHub tokens whose subject is
 `repo:delirium95/my_project:environment:lambda-production`; it uses short-lived OIDC credentials,

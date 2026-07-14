@@ -38,9 +38,12 @@ Add these environment **secrets** (never variables):
 | `DATABASE_URL` | TLS RDS PostgreSQL URL |
 | `REDIS_URL` | Private TLS ElastiCache URL |
 | `JWT_SECRET` | Unique application signing secret, 32+ characters |
+| `KAGGLE_USERNAME` | Kaggle account username for the optional in-app importer |
+| `KAGGLE_KEY` | Kaggle API token for the optional in-app importer |
 
-The workflow intentionally does not supply Kaggle credentials. The low-cost private-VPC deployment
-profile has no NAT Gateway; seed data locally as described in [cloud-deployment.md](cloud-deployment.md).
+The deploy job passes the optional Kaggle credentials only to the API Lambda. The VPC still needs
+the optional one-AZ NAT Gateway while the importer downloads the archive; disable it after the
+one-time import as described in [cloud-deployment.md](cloud-deployment.md).
 
 ## AWS OIDC role
 

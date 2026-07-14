@@ -147,6 +147,8 @@ jobs:
           FrontendOrigin="${{ vars.FRONTEND_ORIGIN }}"
           LambdaSubnetIds="${{ vars.LAMBDA_SUBNET_IDS }}"
           LambdaSecurityGroupId="${{ vars.LAMBDA_SECURITY_GROUP_ID }}"
+          KaggleUsername="${{ secrets.KAGGLE_USERNAME }}"
+          KaggleKey="${{ secrets.KAGGLE_KEY }}"
       - name: Apply Alembic migrations through the private migration Lambda
         run: |
           migration_function=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='BoutiqueMigrationFunctionName'].OutputValue | [0]" --output text)

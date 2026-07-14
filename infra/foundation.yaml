@@ -1,7 +1,8 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
   Cost-conscious foundation for Boutique Analytics: private data stores, a private static-site
-  bucket served by CloudFront, and a GitHub Actions OIDC deployment role.
+  bucket served by CloudFront, a GitHub Actions OIDC deployment role, and optional one-AZ
+  NAT egress for a server-side Kaggle import.
 
 Parameters:
   ProjectName:
@@ -26,12 +27,26 @@ Parameters:
   GitHubEnvironment:
     Type: String
     Default: lambda-production
+  EnableKaggleNatGateway:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Enable a single-AZ NAT Gateway so the VPC Lambda can download Kaggle data.
+  KaggleNatPublicSubnetId:
+    Type: String
+    Default: ""
+    Description: Public subnet for the optional NAT Gateway. It must retain a route to an Internet Gateway.
+
+Conditions:
+  UseKaggleNatGateway: !Equals [!Ref EnableKaggleNatGateway, "true"]
 
 Resources:
   LambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Boutique Lambda egress to PostgreSQL and Redis only
+      GroupDescription: Boutique Lambda egress to private data stores and optional Kaggle import
       VpcId: !Ref VpcId
       Tags:
         - Key: Name
@@ -64,6 +79,54 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${ProjectName}-redis"
+
+  KaggleNatElasticIp:
+    Type: AWS::EC2::EIP
+    Condition: UseKaggleNatGateway
+    Properties:
+      Domain: vpc
+
+  KaggleNatGateway:
+    Type: AWS::EC2::NatGateway
+    Condition: UseKaggleNatGateway
+    Properties:
+      AllocationId: !GetAtt KaggleNatElasticIp.AllocationId
+      ConnectivityType: public
+      SubnetId: !Ref KaggleNatPublicSubnetId
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-kaggle-import"
+
+  LambdaPrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Condition: UseKaggleNatGateway
+    Properties:
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-lambda-private"
+
+  LambdaInternetRoute:
+    Type: AWS::EC2::Route
+    Condition: UseKaggleNatGateway
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref KaggleNatGateway
+      RouteTableId: !Ref LambdaPrivateRouteTable
+
+  FirstLambdaSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: UseKaggleNatGateway
+    Properties:
+      RouteTableId: !Ref LambdaPrivateRouteTable
+      SubnetId: !Select [0, !Ref SubnetIds]
+
+  SecondLambdaSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: UseKaggleNatGateway
+    Properties:
+      RouteTableId: !Ref LambdaPrivateRouteTable
+      SubnetId: !Select [1, !Ref SubnetIds]
 
   DatabaseSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
@@ -242,6 +305,9 @@ Outputs:
     Value: !GetAtt GitHubDeploymentRole.Arn
   LambdaSecurityGroupId:
     Value: !Ref LambdaSecurityGroup
+  KaggleNatGatewayId:
+    Description: Delete by updating EnableKaggleNatGateway=false after the one-time Kaggle import.
+    Value: !If [UseKaggleNatGateway, !Ref KaggleNatGateway, ""]
   RedisEndpoint:
     Value: !GetAtt BoutiqueCache.PrimaryEndPoint.Address
   RedisPort:
