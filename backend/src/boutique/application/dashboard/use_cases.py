@@ -5,7 +5,11 @@ from boutique.application.dashboard.cache_keys import (
     monthly_revenue_cache_key,
 )
 from boutique.application.dashboard.interfaces import (
+    GetCategoryRevenueConcentrationUseCase,
+    GetCohortRetentionUseCase,
     GetDashboardSummaryUseCase,
+    GetDataFreshnessUseCase,
+    GetLogNormalFitUseCase,
     GetMonthlyRevenueUseCase,
     GetOrderValueDistributionUseCase,
     GetPearsonCorrelationsUseCase,
@@ -14,7 +18,11 @@ from boutique.application.dashboard.interfaces import (
 from boutique.domain.common.cache import BaseCacheService
 from boutique.domain.dashboard.interfaces import DashboardQueryService
 from boutique.domain.dashboard.models import (
+    CategoryRevenueConcentrationPoint,
+    CohortRetentionPoint,
     DashboardSummary,
+    DataFreshness,
+    LogNormalFit,
     OrderValueDistributionBin,
     PearsonCorrelation,
     RecentOrder,
@@ -123,3 +131,51 @@ class GetPearsonCorrelationsUseCaseImpl(GetPearsonCorrelationsUseCase):
             start_date=start_date,
             end_date=end_date,
         )
+
+
+class GetLogNormalFitUseCaseImpl(GetLogNormalFitUseCase):
+    def __init__(self, *, query_service: DashboardQueryService) -> None:
+        self._query_service = query_service
+
+    async def __call__(
+        self,
+        *,
+        start_date: date | None,
+        end_date: date | None,
+    ) -> LogNormalFit:
+        return await self._query_service.get_log_normal_fit(
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+
+class GetCategoryRevenueConcentrationUseCaseImpl(GetCategoryRevenueConcentrationUseCase):
+    def __init__(self, *, query_service: DashboardQueryService) -> None:
+        self._query_service = query_service
+
+    async def __call__(
+        self,
+        *,
+        start_date: date | None,
+        end_date: date | None,
+    ) -> list[CategoryRevenueConcentrationPoint]:
+        return await self._query_service.get_category_revenue_concentration(
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+
+class GetCohortRetentionUseCaseImpl(GetCohortRetentionUseCase):
+    def __init__(self, *, query_service: DashboardQueryService) -> None:
+        self._query_service = query_service
+
+    async def __call__(self) -> list[CohortRetentionPoint]:
+        return await self._query_service.get_cohort_retention()
+
+
+class GetDataFreshnessUseCaseImpl(GetDataFreshnessUseCase):
+    def __init__(self, *, query_service: DashboardQueryService) -> None:
+        self._query_service = query_service
+
+    async def __call__(self) -> DataFreshness:
+        return await self._query_service.get_data_freshness()

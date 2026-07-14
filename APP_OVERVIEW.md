@@ -30,7 +30,17 @@ flowchart LR
 - The **Order-value distribution** is a ten-bin histogram of delivered order totals.
 - The **Pearson correlation heatmap** compares four order-level numeric variables: item count,
   item value, freight, and total order value. Hovering a cell reveals the exact coefficient.
+- The order-value histogram overlays a maximum-likelihood log-normal curve and a log-scale
+  Gaussian KDE. The fit panel adds log-likelihood, AIC, BIC, and a QQ plot for an honest model
+  check rather than a decorative density line.
+- The **category Pareto view** shows which product categories make up cumulative delivered
+  revenue, while the **cohort retention heatmap** shows repeat-customer activity from first
+  delivered purchase through month 11.
 - The latest-orders table complements the charts with record-level detail.
+
+The header displays **Data last updated** from a database record written only after a complete
+Olist import commits successfully. Re-import once after the current migration to populate this
+timestamp and Olist's repeat-customer identity for cohorts.
 
 ## Local services
 

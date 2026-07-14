@@ -43,6 +43,8 @@ def integration_settings() -> Settings:
         cookie_secure=False,
         redis_url=_integration_redis_url(redis_url=local_settings.redis_url),
         serverless=local_settings.serverless,
+        kaggle_username=None,
+        kaggle_key=None,
     )
 
 
@@ -150,7 +152,7 @@ def test_kaggle_import_requires_server_credentials(client: TestClient) -> None:
     assert "KAGGLE_USERNAME" in response.json()["detail"]
 
 
-def test_dashboard_eda_returns_distribution_and_pearson_matrix(
+def test_dashboard_eda_returns_statistical_analytics(
     client: TestClient,
     seeded_eda_data: None,
 ) -> None:
@@ -173,6 +175,37 @@ def test_dashboard_eda_returns_distribution_and_pearson_matrix(
         item for item in correlations.json() if item["x"] == "Items" and item["y"] == "Items"
     )
     assert items_diagonal["coefficient"] == pytest.approx(1.0)
+
+    log_normal_fit = client.get("/api/v1/dashboard/fit/log-normal", headers=headers)
+    assert log_normal_fit.status_code == 200
+    fit = log_normal_fit.json()
+    assert fit["sample_size"] == 3
+    assert fit["log_likelihood"] is not None
+    assert len(fit["density_points"]) == 41
+    assert len(fit["kde_points"]) == 41
+    assert len(fit["qq_points"]) == 3
+
+    pareto = client.get("/api/v1/dashboard/pareto", headers=headers)
+    assert pareto.status_code == 200
+    pareto_points = pareto.json()
+    assert len(pareto_points) == 1
+    assert pareto_points[0]["category"] == "books"
+    assert float(pareto_points[0]["revenue"]) == pytest.approx(382.0)
+    assert pareto_points[0]["cumulative_share"] == pytest.approx(1.0)
+
+    cohorts = client.get("/api/v1/dashboard/cohorts", headers=headers)
+    assert cohorts.status_code == 200
+    cohort_points = cohorts.json()
+    february_cohort = next(
+        point
+        for point in cohort_points
+        if point["cohort_month"] == "2017-02-01" and point["month_number"] == 1
+    )
+    assert february_cohort["retention_rate"] == pytest.approx(1.0)
+
+    freshness = client.get("/api/v1/dashboard/data-freshness", headers=headers)
+    assert freshness.status_code == 200
+    assert "last_imported_at" in freshness.json()
 
     invalid_range = client.get(
         "/api/v1/dashboard/correlations?start_date=2018-01-02&end_date=2018-01-01",
@@ -225,7 +258,16 @@ async def _insert_eda_fixture(*, settings: Settings) -> dict[str, list[str] | st
     session_factory = make_session_factory(engine=engine)
     try:
         async with session_factory() as session:
-            session.add_all([Customer(id=customer_id, state="SP") for customer_id in customer_ids])
+            session.add_all(
+                [
+                    Customer(
+                        id=customer_id,
+                        unique_id=("integration-repeat-customer" if index > 1 else customer_id),
+                        state="SP",
+                    )
+                    for index, customer_id in enumerate(customer_ids, start=1)
+                ]
+            )
             session.add(Product(id=product_id, category="books"))
             session.add_all(
                 [

@@ -1,13 +1,21 @@
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, select, text
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from boutique.domain.dataset.exceptions import DatasetAlreadySeededError
 from boutique.domain.dataset.interfaces import DatasetRepository
 from boutique.domain.dataset.models import OlistDataset, SeedResult
-from boutique.infrastructure.database.models import Customer, Order, OrderItem, Product
+from boutique.infrastructure.database.models import (
+    Customer,
+    DatasetMetadata,
+    Order,
+    OrderItem,
+    Product,
+)
 
 _BATCH_SIZE = 5_000
 
@@ -29,6 +37,15 @@ class SqlAlchemyDatasetRepository(DatasetRepository):
         await self._insert_in_batches(model=Product, rows=dataset.products)
         await self._insert_in_batches(model=Order, rows=dataset.orders)
         await self._insert_in_batches(model=OrderItem, rows=dataset.order_items)
+        imported_at = datetime.now(UTC)
+        await self._session.execute(
+            insert(DatasetMetadata)
+            .values(dataset_name="olist", last_imported_at=imported_at)
+            .on_conflict_do_update(
+                index_elements=[DatasetMetadata.dataset_name],
+                set_={"last_imported_at": imported_at},
+            )
+        )
         return SeedResult(
             customers=len(dataset.customers),
             products=len(dataset.products),

@@ -1,0 +1,145 @@
+name: Verify and deploy
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: boutique-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend quality, migrations, and tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql+asyncpg://boutique:boutique@localhost:5432/boutique
+      REDIS_URL: redis://localhost:6379/0
+      ENVIRONMENT: integration
+      JWT_SECRET: github-actions-integration-secret-that-is-long-enough
+      COOKIE_SECURE: "false"
+      RUN_INTEGRATION_TESTS: "1"
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: boutique
+          POSTGRES_USER: boutique
+          POSTGRES_PASSWORD: boutique
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U boutique -d boutique"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@v8
+        with:
+          enable-cache: true
+          python-version: "3.14"
+      - name: Install backend dependencies
+        run: uv sync --all-groups --frozen
+      - name: Run Ruff
+        run: |
+          uv run ruff check src tests
+          uv run ruff format --check src tests
+      - name: Run repository pre-commit hooks
+        working-directory: .
+        run: uv run --project backend pre-commit run --all-files
+      - name: Upgrade the disposable database
+        run: uv run alembic upgrade head
+      - name: Validate migration completeness
+        run: uv run alembic check
+      - name: Run unit tests with coverage
+        run: >-
+          uv run pytest tests/unit --cov=boutique --cov-report=term-missing
+          --cov-report=xml:coverage.xml
+      - name: Run integration tests with coverage
+        run: >-
+          uv run pytest -m integration --cov=boutique --cov-append
+          --cov-report=term-missing --cov-report=xml:coverage.xml
+      - name: Upload backend coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+          if-no-files-found: error
+
+  frontend:
+    name: Frontend type-check and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Type-check TypeScript
+        run: npm run typecheck
+      - name: Build production bundle
+        run: npm run build
+
+  deploy-lambda:
+    name: Deploy Lambda container
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - backend
+      - frontend
+    runs-on: ubuntu-latest
+    environment: lambda-production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      STACK_NAME: ${{ vars.AWS_SAM_STACK_NAME }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Configure AWS credentials through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Install AWS SAM CLI
+        uses: aws-actions/setup-sam@v2
+      - name: Build Lambda image
+        run: sam build --template-file infra/template.yaml --use-buildkit
+      - name: Deploy Lambda image and CloudFormation stack
+        run: >-
+          sam deploy --template-file .aws-sam/build/template.yaml
+          --stack-name "$STACK_NAME" --resolve-image-repos
+          --capabilities CAPABILITY_IAM --no-confirm-changeset --no-fail-on-empty-changeset
+          --parameter-overrides
+          DatabaseUrl="${{ secrets.DATABASE_URL }}"
+          RedisUrl="${{ secrets.REDIS_URL }}"
+          JwtSecret="${{ secrets.JWT_SECRET }}"
+          FrontendOrigin="${{ vars.FRONTEND_ORIGIN }}"
+          LambdaSubnetIds="${{ vars.LAMBDA_SUBNET_IDS }}"
+          LambdaSecurityGroupId="${{ vars.LAMBDA_SECURITY_GROUP_ID }}"

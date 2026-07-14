@@ -13,7 +13,9 @@ import boutique.infrastructure.database.models  # noqa: F401 - registers model m
 config = context.config
 settings = get_settings()
 database_url, database_connect_args = normalize_async_database_url(settings.database_url)
-config.set_main_option("sqlalchemy.url", str(database_url))
+# ``str(URL)`` intentionally masks the password as ``***``. Alembic later reads this
+# value back to create its engine, so pass an unmasked URL only to its in-process config.
+config.set_main_option("sqlalchemy.url", database_url.render_as_string(hide_password=False))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
