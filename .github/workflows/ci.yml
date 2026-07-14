@@ -138,7 +138,7 @@ jobs:
       - name: Deploy Lambda image and CloudFormation stack
         run: >-
           sam deploy --template-file .aws-sam/build/template.yaml
-          --stack-name "$STACK_NAME" --resolve-image-repos
+          --stack-name "$STACK_NAME" --resolve-image-repos --resolve-s3
           --capabilities CAPABILITY_IAM --no-confirm-changeset --no-fail-on-empty-changeset
           --parameter-overrides
           DatabaseUrl="${{ secrets.DATABASE_URL }}"
