@@ -16,5 +16,7 @@ FROM public.ecr.aws/lambda/python:3.14
 # Lambda adds LAMBDA_TASK_ROOT (/var/task) to Python's module search path.
 COPY --from=builder /app/.venv/lib/python3.14/site-packages/ ${LAMBDA_TASK_ROOT}/
 COPY --from=builder /app/src/boutique ${LAMBDA_TASK_ROOT}/boutique
+COPY alembic ${LAMBDA_TASK_ROOT}/alembic
+COPY alembic.ini ${LAMBDA_TASK_ROOT}/alembic.ini
 
 CMD ["boutique.lambda_handler.handler"]

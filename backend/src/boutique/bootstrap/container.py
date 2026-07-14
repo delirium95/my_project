@@ -9,7 +9,11 @@ from boutique.application.auth.use_cases import (
     RegisterUserUseCaseImpl,
 )
 from boutique.application.dashboard.use_cases import (
+    GetCategoryRevenueConcentrationUseCaseImpl,
+    GetCohortRetentionUseCaseImpl,
     GetDashboardSummaryUseCaseImpl,
+    GetDataFreshnessUseCaseImpl,
+    GetLogNormalFitUseCaseImpl,
     GetMonthlyRevenueUseCaseImpl,
     GetOrderValueDistributionUseCaseImpl,
     GetPearsonCorrelationsUseCaseImpl,
@@ -99,6 +103,22 @@ class Container(containers.DeclarativeContainer):
     )
     get_pearson_correlations = providers.Factory(
         GetPearsonCorrelationsUseCaseImpl,
+        query_service=dashboard_query_service,
+    )
+    get_log_normal_fit = providers.Factory(
+        GetLogNormalFitUseCaseImpl,
+        query_service=dashboard_query_service,
+    )
+    get_category_revenue_concentration = providers.Factory(
+        GetCategoryRevenueConcentrationUseCaseImpl,
+        query_service=dashboard_query_service,
+    )
+    get_cohort_retention = providers.Factory(
+        GetCohortRetentionUseCaseImpl,
+        query_service=dashboard_query_service,
+    )
+    get_data_freshness = providers.Factory(
+        GetDataFreshnessUseCaseImpl,
         query_service=dashboard_query_service,
     )
     upsert_order = providers.Factory(UpsertOrderUseCaseImpl, unit_of_work=unit_of_work)

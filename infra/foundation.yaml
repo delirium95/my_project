@@ -1,0 +1,252 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Cost-conscious foundation for Boutique Analytics: private data stores, a private static-site
+  bucket served by CloudFront, and a GitHub Actions OIDC deployment role.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: boutique-analytics-demo
+    AllowedPattern: "[a-z0-9-]+"
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Existing VPC that contains at least two subnets in different Availability Zones.
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: At least two subnets in the selected VPC.
+  DatabasePassword:
+    Type: String
+    NoEcho: true
+    MinLength: 16
+    Description: Generated PostgreSQL password. Keep it only in GitHub Environment secrets.
+  GitHubRepository:
+    Type: String
+    Default: delirium95/my_project
+    AllowedPattern: "[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
+  GitHubEnvironment:
+    Type: String
+    Default: lambda-production
+
+Resources:
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Boutique Lambda egress to PostgreSQL and Redis only
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-lambda"
+
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: PostgreSQL ingress only from Boutique Lambda
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref LambdaSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-postgres"
+
+  CacheSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Redis ingress only from Boutique Lambda
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          SourceSecurityGroupId: !Ref LambdaSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-redis"
+
+  DatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Boutique database subnets
+      SubnetIds: !Ref SubnetIds
+
+  BoutiqueDatabase:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      AllocatedStorage: "20"
+      AutoMinorVersionUpgrade: true
+      BackupRetentionPeriod: 0
+      DBInstanceClass: db.t3.micro
+      DBInstanceIdentifier: !Sub "${ProjectName}-postgres"
+      DBName: boutique
+      DBSubnetGroupName: !Ref DatabaseSubnetGroup
+      DeletionProtection: false
+      Engine: postgres
+      MasterUsername: boutique
+      MasterUserPassword: !Ref DatabasePassword
+      MultiAZ: false
+      PubliclyAccessible: false
+      StorageEncrypted: true
+      StorageType: gp3
+      VPCSecurityGroups:
+        - !Ref DatabaseSecurityGroup
+
+  CacheSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: Boutique Redis subnets
+      SubnetIds: !Ref SubnetIds
+
+  BoutiqueCache:
+    Type: AWS::ElastiCache::ReplicationGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      AtRestEncryptionEnabled: true
+      AutomaticFailoverEnabled: false
+      CacheNodeType: cache.t3.micro
+      CacheSubnetGroupName: !Ref CacheSubnetGroup
+      Engine: redis
+      EngineVersion: "7.1"
+      NumCacheClusters: 1
+      ReplicationGroupDescription: Boutique Analytics cache
+      ReplicationGroupId: !Sub "${ProjectName}-redis"
+      SecurityGroupIds:
+        - !Ref CacheSecurityGroup
+      TransitEncryptionEnabled: true
+      TransitEncryptionMode: preferred
+
+  StaticSiteBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      BucketName: !Sub "${ProjectName}-${AWS::AccountId}-${AWS::Region}"
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  StaticSiteOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Description: Signed CloudFront reads from the private Boutique static site bucket
+        Name: !Sub "${ProjectName}-s3-oac"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  StaticSiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: Boutique Analytics static frontend
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          Compress: true
+          TargetOriginId: static-site-s3
+          ViewerProtocolPolicy: redirect-to-https
+        DefaultRootObject: index.html
+        Enabled: true
+        HttpVersion: http2
+        IPV6Enabled: true
+        Origins:
+          - DomainName: !GetAtt StaticSiteBucket.RegionalDomainName
+            Id: static-site-s3
+            OriginAccessControlId: !GetAtt StaticSiteOriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        PriceClass: PriceClass_100
+
+  StaticSiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref StaticSiteBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${StaticSiteBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${StaticSiteDistribution}"
+
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      ClientIdList:
+        - sts.amazonaws.com
+      Url: https://token.actions.githubusercontent.com
+
+  GitHubDeploymentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-github-deploy"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOidcProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubRepository}:environment:${GitHubEnvironment}"
+      ManagedPolicyArns:
+        # Deliberately broad for the disposable demo account. Replace before a production account.
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+Outputs:
+  CloudFrontDistributionId:
+    Value: !Ref StaticSiteDistribution
+  CloudFrontDomainName:
+    Value: !GetAtt StaticSiteDistribution.DomainName
+  DatabaseEndpoint:
+    Value: !GetAtt BoutiqueDatabase.Endpoint.Address
+  DatabasePort:
+    Value: !GetAtt BoutiqueDatabase.Endpoint.Port
+  DatabaseUrlTemplate:
+    Description: Add the generated password outside CloudFormation; do not store it in source control.
+    Value: !Sub "postgresql://boutique:PASSWORD@${BoutiqueDatabase.Endpoint.Address}:${BoutiqueDatabase.Endpoint.Port}/boutique?sslmode=require"
+  GitHubDeploymentRoleArn:
+    Value: !GetAtt GitHubDeploymentRole.Arn
+  LambdaSecurityGroupId:
+    Value: !Ref LambdaSecurityGroup
+  RedisEndpoint:
+    Value: !GetAtt BoutiqueCache.PrimaryEndPoint.Address
+  RedisPort:
+    Value: !GetAtt BoutiqueCache.PrimaryEndPoint.Port
+  RedisUrl:
+    Value: !Sub "rediss://${BoutiqueCache.PrimaryEndPoint.Address}:${BoutiqueCache.PrimaryEndPoint.Port}/0"
+  StaticSiteBucketName:
+    Value: !Ref StaticSiteBucket

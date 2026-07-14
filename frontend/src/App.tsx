@@ -5,9 +5,13 @@ import {
   authApi,
   dashboardApi,
   datasetApi,
+  type CategoryRevenueConcentrationPoint,
+  type CohortRetentionPoint,
+  type DataFreshness,
   type DateRange,
   type DashboardSummary,
   type DatasetImportResult,
+  type LogNormalFit,
   type OrderValueDistributionBin,
   type PearsonCorrelation,
   type RecentOrder,
@@ -15,7 +19,10 @@ import {
 } from "./api";
 import { AnalyticsDateFilter } from "./components/AnalyticsDateFilter";
 import { AuthForm } from "./components/AuthForm";
+import { CategoryRevenueConcentrationChart } from "./components/CategoryRevenueConcentrationChart";
+import { CohortRetentionHeatmap } from "./components/CohortRetentionHeatmap";
 import { DashboardHeader } from "./components/DashboardHeader";
+import { LogNormalFitDiagnostics } from "./components/LogNormalFitDiagnostics";
 import { MetricCard } from "./components/MetricCard";
 import { OrderValueDistributionChart } from "./components/OrderValueDistributionChart";
 import { PearsonCorrelationHeatmap } from "./components/PearsonCorrelationHeatmap";
@@ -24,8 +31,12 @@ import { RevenueChart } from "./components/RevenueChart";
 import { formatMoney } from "./format";
 
 interface DashboardData {
+  categoryRevenueConcentration: CategoryRevenueConcentrationPoint[];
+  cohortRetention: CohortRetentionPoint[];
   correlations: PearsonCorrelation[];
+  dataFreshness: DataFreshness;
   distribution: OrderValueDistributionBin[];
+  logNormalFit: LogNormalFit;
   orders: RecentOrder[];
   revenue: RevenuePoint[];
   summary: DashboardSummary;
@@ -51,15 +62,39 @@ function Dashboard({ accessToken, onLogout }: { accessToken: string; onLogout: (
     async function loadDashboard() {
       setError(null);
       try {
-        const [summary, revenue, orders, distribution, correlations] = await Promise.all([
+        const [
+          summary,
+          revenue,
+          orders,
+          distribution,
+          correlations,
+          logNormalFit,
+          categoryRevenueConcentration,
+          cohortRetention,
+          dataFreshness,
+        ] = await Promise.all([
           dashboardApi.summary(accessToken),
           dashboardApi.revenue(dateRange, accessToken),
           dashboardApi.orders(accessToken),
           dashboardApi.distribution(dateRange, accessToken),
           dashboardApi.correlations(dateRange, accessToken),
+          dashboardApi.logNormalFit(dateRange, accessToken),
+          dashboardApi.categoryRevenueConcentration(dateRange, accessToken),
+          dashboardApi.cohortRetention(accessToken),
+          dashboardApi.dataFreshness(accessToken),
         ]);
         if (isCurrent) {
-          setData({ correlations, distribution, orders, revenue, summary });
+          setData({
+            categoryRevenueConcentration,
+            cohortRetention,
+            correlations,
+            dataFreshness,
+            distribution,
+            logNormalFit,
+            orders,
+            revenue,
+            summary,
+          });
         }
       } catch (requestError) {
         if (isCurrent) {
@@ -91,7 +126,11 @@ function Dashboard({ accessToken, onLogout }: { accessToken: string; onLogout: (
 
   return (
     <>
-      <DashboardHeader onImport={importKaggleOlist} onLogout={() => void onLogout()} />
+      <DashboardHeader
+        lastImportedAt={data?.dataFreshness.last_imported_at ?? null}
+        onImport={importKaggleOlist}
+        onLogout={() => void onLogout()}
+      />
       <Container component="main" maxWidth="lg" sx={{ py: 4 }}>
         {error ? (
           <Alert severity="error">{error}</Alert>
@@ -112,12 +151,21 @@ function Dashboard({ accessToken, onLogout }: { accessToken: string; onLogout: (
             <RevenueChart points={data.revenue} />
             <Grid container spacing={3}>
               <Grid size={{ md: 6, xs: 12 }}>
-                <OrderValueDistributionChart bins={data.distribution} />
+                <OrderValueDistributionChart bins={data.distribution} fit={data.logNormalFit} />
               </Grid>
               <Grid size={{ md: 6, xs: 12 }}>
                 <PearsonCorrelationHeatmap correlations={data.correlations} />
               </Grid>
             </Grid>
+            <Grid container spacing={3}>
+              <Grid size={{ md: 6, xs: 12 }}>
+                <CategoryRevenueConcentrationChart points={data.categoryRevenueConcentration} />
+              </Grid>
+              <Grid size={{ md: 6, xs: 12 }}>
+                <LogNormalFitDiagnostics fit={data.logNormalFit} />
+              </Grid>
+            </Grid>
+            <CohortRetentionHeatmap points={data.cohortRetention} />
             <RecentOrdersTable orders={data.orders} />
           </Stack>
         ) : null}

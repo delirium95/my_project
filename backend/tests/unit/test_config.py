@@ -7,12 +7,17 @@ from boutique.config import Settings
 @pytest.mark.unit
 def test_production_settings_reject_insecure_authentication_defaults() -> None:
     with pytest.raises(ValidationError, match="JWT_SECRET"):
-        Settings(environment="production")
+        Settings(
+            environment="production",
+            jwt_secret="local-development-only-change-me",
+            cookie_secure=True,
+        )
 
     with pytest.raises(ValidationError, match="COOKIE_SECURE"):
         Settings(
             environment="production",
             jwt_secret="production-secret-that-is-long-and-unique",
+            cookie_secure=False,
         )
 
 

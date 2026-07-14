@@ -48,7 +48,11 @@ class OlistCsvSource(DatasetSource):
         list[dict[str, str | int]],
     ]:
         customers = [
-            {"id": row["customer_id"], "state": row["customer_state"]}
+            {
+                "id": row["customer_id"],
+                "unique_id": row["customer_unique_id"],
+                "state": row["customer_state"],
+            }
             for row in _read_csv(paths["customers"])
         ]
         products = [

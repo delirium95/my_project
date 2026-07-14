@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from boutique.domain.common.models import ValueObject
@@ -67,3 +67,47 @@ class PearsonCorrelation(ValueObject):
     x: str
     y: str
     coefficient: float | None
+
+
+class LogNormalDensityPoint(ValueObject):
+    order_value: Money
+    density: float
+
+
+class LogNormalQuantilePoint(ValueObject):
+    theoretical_value: Money
+    observed_value: Money
+
+
+class KernelDensityPoint(ValueObject):
+    order_value: Money
+    density: float
+
+
+class LogNormalFit(ValueObject):
+    sample_size: int
+    mu: float | None
+    sigma: float | None
+    log_likelihood: float | None
+    aic: float | None
+    bic: float | None
+    density_points: list[LogNormalDensityPoint]
+    kde_points: list[KernelDensityPoint]
+    qq_points: list[LogNormalQuantilePoint]
+
+
+class CategoryRevenueConcentrationPoint(ValueObject):
+    category: str
+    revenue: Money
+    cumulative_share: float
+
+
+class CohortRetentionPoint(ValueObject):
+    cohort_month: date
+    active_customers: int
+    month_number: int
+    retention_rate: float
+
+
+class DataFreshness(ValueObject):
+    last_imported_at: datetime | None

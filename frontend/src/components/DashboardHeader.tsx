@@ -2,14 +2,16 @@ import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import { AppBar, Box, Button, Toolbar, Typography } from "@mui/material";
 
 import type { DatasetImportResult } from "../api";
+import { formatTimestamp } from "../format";
 import { KaggleImportDialog } from "./KaggleImportDialog";
 
 interface DashboardHeaderProps {
   onImport: (replaceExisting: boolean) => Promise<DatasetImportResult>;
   onLogout: () => void;
+  lastImportedAt: string | null;
 }
 
-export function DashboardHeader({ onImport, onLogout }: DashboardHeaderProps) {
+export function DashboardHeader({ lastImportedAt, onImport, onLogout }: DashboardHeaderProps) {
   return (
     <AppBar color="inherit" elevation={0} position="sticky" sx={{ borderBottom: 1, borderColor: "divider" }}>
       <Toolbar sx={{ justifyContent: "space-between", mx: "auto", width: "100%", maxWidth: 1240 }}>
@@ -19,6 +21,9 @@ export function DashboardHeader({ onImport, onLogout }: DashboardHeaderProps) {
           </Typography>
           <Typography component="h1" variant="h6">
             Commerce overview
+          </Typography>
+          <Typography color="text.secondary" variant="caption">
+            Data last updated: {formatTimestamp(lastImportedAt)}
           </Typography>
         </Box>
         <Box sx={{ alignItems: "center", display: "flex", gap: 1 }}>

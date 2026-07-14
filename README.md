@@ -57,7 +57,7 @@ place where production adapters are wired to application ports.
 | `backend/alembic/` | Database migrations |
 | `docker-compose.yml` | Local PostgreSQL and Redis services |
 | `APP_OVERVIEW.md` | Concise product and EDA overview |
-| `docs/cloud-deployment.md` | AWS Lambda, RDS, ElastiCache, and Amplify deployment walkthrough |
+| `docs/cloud-deployment.md` | AWS Lambda, RDS, ElastiCache, private S3, and CloudFront deployment walkthrough |
 
 ## Product flow
 
@@ -80,12 +80,23 @@ The dashboard is deliberately more than a KPI screen:
 | Monthly revenue chart | How does delivered revenue move over time? |
 | Latest orders table | Which individual orders make up the operational data? |
 | Order-value distribution | Are delivered order totals concentrated, spread out, or long-tailed? |
+| Distribution fit | Does a log-normal model describe order values, and how does it compare with KDE? |
 | Pearson heatmap | How strongly are item count, item value, freight, and order total related? |
+| Category Pareto | Which product categories account for the cumulative share of delivered revenue? |
+| Cohort retention | How many repeat customers return in the months after their first delivered purchase? |
 
 The **From** / **To** controls scope the monthly revenue chart, the ten-bin order-value
 histogram, and the correlation calculation. Hovering a heatmap cell shows its exact Pearson
 coefficient. The correlation is calculated from delivered, order-level records rather than
 from already-aggregated monthly figures.
+
+The distribution panel overlays two density estimates: a log-normal maximum-likelihood fit and a
+log-scale Gaussian kernel density estimate (KDE). The diagnostics card makes the model explicit
+with `μ`, `σ`, log-likelihood, AIC, BIC, and a QQ plot. Cohorts use the Olist repeat-customer
+identity across all delivered-order history, so they remain interpretable even while the date
+filter changes the other charts. The dashboard header displays the timestamp of the most recent
+successful dataset import; re-import Olist data once after applying the latest migration to fill
+both that timestamp and customer-retention identity.
 
 ## Run locally
 
@@ -153,7 +164,7 @@ The OpenAPI page is authoritative for request and response shapes. The main rout
 | --- | --- |
 | Health | `GET /api/v1/health/live`, `GET /api/v1/health/ready` |
 | Authentication | `POST /api/v1/auth/register`, `login`, `refresh`, `logout`; `GET /api/v1/auth/me` |
-| Dashboard | `GET /api/v1/dashboard/summary`, `revenue`, `orders`, `distribution`, `correlations` |
+| Dashboard | `GET /api/v1/dashboard/summary`, `revenue`, `orders`, `distribution`, `correlations`, `fit/log-normal`, `pareto`, `cohorts`, `data-freshness` |
 | Data import | `POST /api/v1/dataset/import/kaggle` |
 
 Dashboard and import routes require an access token. The date-aware analytical endpoints use
@@ -201,8 +212,8 @@ npm run build
 
 ## Deploy to the cloud
 
-The AWS deployment profile is **Amplify Hosting → Lambda Function URL → RDS PostgreSQL +
-ElastiCache Serverless**. The API runs as the included Lambda container image with
+The AWS deployment profile is **CloudFront → private S3 static site** plus a **Lambda Function
+URL → RDS PostgreSQL + ElastiCache Redis** API. The API runs as the included Lambda container image with
 `SERVERLESS=true`; RDS and Redis remain private in the VPC.
 
 Follow the complete, copy-ready setup in [docs/cloud-deployment.md](docs/cloud-deployment.md).
@@ -215,3 +226,4 @@ operational cautions. The backend can also run as a Lambda container; see
 - [Application overview and EDA notes](APP_OVERVIEW.md)
 - [Backend architecture, testing, and seed commands](backend/README.md)
 - [Cloud deployment guide](docs/cloud-deployment.md)
+- [GitHub Actions, coverage, migrations, and Lambda deploy](docs/github-actions.md)

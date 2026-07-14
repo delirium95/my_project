@@ -37,6 +37,45 @@ export interface PearsonCorrelation {
   y: string;
 }
 
+export interface OrderValueDensityPoint {
+  order_value: string;
+  density: number;
+}
+
+export interface LogNormalQuantilePoint {
+  observed_value: string;
+  theoretical_value: string;
+}
+
+export interface LogNormalFit {
+  aic: number | null;
+  bic: number | null;
+  density_points: OrderValueDensityPoint[];
+  kde_points: OrderValueDensityPoint[];
+  log_likelihood: number | null;
+  mu: number | null;
+  qq_points: LogNormalQuantilePoint[];
+  sample_size: number;
+  sigma: number | null;
+}
+
+export interface CategoryRevenueConcentrationPoint {
+  category: string;
+  cumulative_share: number;
+  revenue: string;
+}
+
+export interface CohortRetentionPoint {
+  active_customers: number;
+  cohort_month: string;
+  month_number: number;
+  retention_rate: number;
+}
+
+export interface DataFreshness {
+  last_imported_at: string | null;
+}
+
 export interface RecentOrder {
   id: string;
   customer_id: string;
@@ -151,10 +190,21 @@ export const datasetApi = {
 };
 
 export const dashboardApi = {
+  categoryRevenueConcentration: (
+    dateRange: DateRange,
+    token: string,
+  ): Promise<CategoryRevenueConcentrationPoint[]> =>
+    request(`/dashboard/pareto${dateRangeQuery(dateRange)}`, { token }),
+  cohortRetention: (token: string): Promise<CohortRetentionPoint[]> =>
+    request("/dashboard/cohorts", { token }),
   correlations: (dateRange: DateRange, token: string): Promise<PearsonCorrelation[]> =>
     request(`/dashboard/correlations${dateRangeQuery(dateRange)}`, { token }),
+  dataFreshness: (token: string): Promise<DataFreshness> =>
+    request("/dashboard/data-freshness", { token }),
   distribution: (dateRange: DateRange, token: string): Promise<OrderValueDistributionBin[]> =>
     request(`/dashboard/distribution${dateRangeQuery(dateRange)}`, { token }),
+  logNormalFit: (dateRange: DateRange, token: string): Promise<LogNormalFit> =>
+    request(`/dashboard/fit/log-normal${dateRangeQuery(dateRange)}`, { token }),
   orders: (token: string): Promise<RecentOrder[]> =>
     request("/dashboard/orders?limit=20", { token }),
   revenue: (dateRange: DateRange, token: string): Promise<RevenuePoint[]> =>

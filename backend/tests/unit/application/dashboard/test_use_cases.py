@@ -12,7 +12,11 @@ from boutique.domain.common.cache import BaseCacheService
 from boutique.domain.common.value_objects import Money
 from boutique.domain.dashboard.interfaces import DashboardQueryService
 from boutique.domain.dashboard.models import (
+    CategoryRevenueConcentrationPoint,
+    CohortRetentionPoint,
     DashboardSummary,
+    DataFreshness,
+    LogNormalFit,
     OrderValueDistributionBin,
     PearsonCorrelation,
     RecentOrder,
@@ -66,6 +70,38 @@ class FakeDashboardQueryService(DashboardQueryService):
         end_date: date | None,
     ) -> list[PearsonCorrelation]:
         return []
+
+    async def get_log_normal_fit(
+        self,
+        *,
+        start_date: date | None,
+        end_date: date | None,
+    ) -> LogNormalFit:
+        return LogNormalFit(
+            sample_size=0,
+            mu=None,
+            sigma=None,
+            log_likelihood=None,
+            aic=None,
+            bic=None,
+            density_points=[],
+            kde_points=[],
+            qq_points=[],
+        )
+
+    async def get_category_revenue_concentration(
+        self,
+        *,
+        start_date: date | None,
+        end_date: date | None,
+    ) -> list[CategoryRevenueConcentrationPoint]:
+        return []
+
+    async def get_cohort_retention(self) -> list[CohortRetentionPoint]:
+        return []
+
+    async def get_data_freshness(self) -> DataFreshness:
+        return DataFreshness(last_imported_at=None)
 
 
 class InMemoryCacheService(BaseCacheService):
