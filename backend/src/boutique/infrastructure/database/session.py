@@ -1,5 +1,6 @@
 import ssl
 from collections.abc import Callable
+from pathlib import Path
 
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.ext.asyncio import (
@@ -9,6 +10,13 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.pool import NullPool
+
+_RDS_CA_BUNDLE = Path(__file__).resolve().parents[3] / "rds-global-bundle.pem"
+
+
+def _rds_ca_bundle_path() -> str | None:
+    """Return the CA bundle packaged in the Lambda image when it is available."""
+    return str(_RDS_CA_BUNDLE) if _RDS_CA_BUNDLE.is_file() else None
 
 
 def normalize_async_database_url(database_url: str) -> tuple[URL, dict[str, object]]:
@@ -32,7 +40,10 @@ def normalize_async_database_url(database_url: str) -> tuple[URL, dict[str, obje
 
     connect_args: dict[str, object] = {}
     if sslmode in {"require", "verify-ca", "verify-full"}:
-        connect_args["ssl"] = ssl.create_default_context()
+        # RDS presents an AWS-issued certificate.  The Lambda base image does
+        # not include that trust chain, so the production image packages the
+        # official RDS bundle.  Local providers continue using system roots.
+        connect_args["ssl"] = ssl.create_default_context(cafile=_rds_ca_bundle_path())
     elif sslmode and sslmode != "disable":
         raise ValueError(f"Unsupported PostgreSQL sslmode for asyncpg: {sslmode}")
 

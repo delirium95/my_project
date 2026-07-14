@@ -10,12 +10,16 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 COPY src ./src
 RUN uv sync --frozen --no-dev
+# Keep TLS verification enabled for RDS.  The official bundle contains the
+# regional and global AWS RDS certificate authorities.
+RUN python -c "from urllib.request import urlretrieve; urlretrieve('https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem', '/app/rds-global-bundle.pem')"
 
 FROM public.ecr.aws/lambda/python:3.14
 
 # Lambda adds LAMBDA_TASK_ROOT (/var/task) to Python's module search path.
 COPY --from=builder /app/.venv/lib/python3.14/site-packages/ ${LAMBDA_TASK_ROOT}/
 COPY --from=builder /app/src/boutique ${LAMBDA_TASK_ROOT}/boutique
+COPY --from=builder /app/rds-global-bundle.pem ${LAMBDA_TASK_ROOT}/rds-global-bundle.pem
 COPY alembic ${LAMBDA_TASK_ROOT}/alembic
 COPY alembic.ini ${LAMBDA_TASK_ROOT}/alembic.ini
 
