@@ -94,3 +94,8 @@ uv run python -m boutique.commands.seed_olist /path/to/olist-csvs --replace
 
 The import runs in one database transaction, loads rows in batches, and invalidates the
 versioned dashboard Redis namespace only after that transaction succeeds.
+
+The Kaggle files are mapped into normalized `customers`, `products`, `orders`, and
+`order_items` tables; they are not copied wholesale into PostgreSQL. See the complete
+[schema and field-mapping documentation](../docs/data-schema.md), including the reasons
+for omitting source fields that are outside the dashboard's current scope.

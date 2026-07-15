@@ -57,6 +57,7 @@ place where production adapters are wired to application ports.
 | `backend/alembic/` | Database migrations |
 | `docker-compose.yml` | Local PostgreSQL and Redis services |
 | `APP_OVERVIEW.md` | Concise product and EDA overview |
+| `docs/data-schema.md` | PostgreSQL schema and Kaggle-to-table mapping |
 | `docs/cloud-deployment.md` | AWS Lambda, RDS, ElastiCache, private S3, and CloudFront deployment walkthrough |
 
 ## Product flow
@@ -225,5 +226,6 @@ operational cautions. The backend can also run as a Lambda container; see
 
 - [Application overview and EDA notes](APP_OVERVIEW.md)
 - [Backend architecture, testing, and seed commands](backend/README.md)
+- [PostgreSQL data model and Kaggle field mapping](docs/data-schema.md)
 - [Cloud deployment guide](docs/cloud-deployment.md)
 - [GitHub Actions, coverage, migrations, and Lambda deploy](docs/github-actions.md)
